@@ -35,6 +35,7 @@ class LBT():
         self.t = np.s_[N//2:-N//2]
 
         self.target_rms = rms_err(quantise(X, quant_step), X)
+        self.bits_ref = calculate_bits(quantise(self.X, self.quant_step))
 
     def encode(self):
         Xp = self.prefilter()
@@ -139,8 +140,7 @@ class LBT():
 
     def comp_ratio(self, Yr):
         """Calculates the compression ratio of the LBT scheme"""
-        bits_ref = calculate_bits(quantise(self.X, self.quant_step))
         bits_comp = self.dctbpp(Yr, 16)
-        print(bits_ref, bits_comp)
-        cr = bits_ref / bits_comp
+        print(self.bits_ref, bits_comp)
+        cr = self.bits_ref / bits_comp
         return cr
