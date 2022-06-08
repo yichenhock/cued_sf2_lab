@@ -1,9 +1,10 @@
 import operator
 import numpy as np
 
+from cued_sf2_lab.laplacian_pyramid import bpp
 from .dct import dct_ii, dct_iv
 
-__all__ = ["pot_ii"]
+__all__ = ["pot_ii", "matrix_splitter", "totalbits", "dct_totalbits"]
 
 def pot_ii(N, s=(1+(5**0.5))/2, overlap=None):
     """
@@ -86,3 +87,26 @@ def pot_ii(N, s=(1+(5**0.5))/2, overlap=None):
     Pf = 0.5*(mtrx_1 @ pf_1 @ mtrx_1)
     Pr = 0.5*(mtrx_1 @ pr_1 @ mtrx_1)
     return Pf, Pr
+
+def matrix_splitter(X, n):
+    """splits an input matrix into n*n smaller square matrices"""
+    l = np.array_split(X, n, axis=0)
+    new_l = []
+    for a in l:
+        l = np.array_split(a, n, axis=1)
+        new_l += l
+    return new_l
+
+def totalbits(X):
+    """Returns the number of bits in an image"""
+    totalbits = bpp(X)*X.shape[0]*X.shape[1]
+    return totalbits
+
+def dct_totalbits(Yr, N):
+    """Returns the number of bits in a DCT image"""
+    Ysplit = matrix_splitter(Yr, N)
+    totalbits = 0
+    for subimage in Ysplit:
+        bits = bpp(subimage)*subimage.shape[0]*subimage.shape[1]
+        totalbits += bits
+    return totalbits
