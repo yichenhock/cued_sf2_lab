@@ -5,6 +5,7 @@ Contains common functions between the schemes
 import math
 import numpy as np
 from cued_sf2_lab.laplacian_pyramid import bpp
+import cv2
 
 def rms_err(Zp, X):
         """Calculates the RMS error between two images"""
@@ -16,6 +17,14 @@ def calculate_bits(X):
         bits = np.shape(X)[0]*np.shape(X)[1]*entropy
         return bits
 
+
+# from skimage.metrics import structural_similarity
+# import cv2
+
+# def ssim(img1, img2):
+#     # Compute SSIM between two images
+#     (score, diff) = structural_similarity(img1, img2, full=True)
+#     return score
 
 def calculate_psnr(img1, img2):
     # img1 and img2 have range [0, 255]
@@ -68,3 +77,4 @@ def calculate_ssim(img1, img2):
             return ssim(np.squeeze(img1), np.squeeze(img2))
     else:
         raise ValueError('Wrong input image dimensions.')
+    
