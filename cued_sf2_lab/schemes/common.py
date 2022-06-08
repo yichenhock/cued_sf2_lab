@@ -1,4 +1,4 @@
-"""coded by Yi Chen
+"""coded by Yi Chen and Joe!
 
 Contains common functions between the schemes
 """
