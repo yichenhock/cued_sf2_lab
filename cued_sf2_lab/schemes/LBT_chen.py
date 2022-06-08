@@ -13,11 +13,10 @@ from cued_sf2_lab.dct import dct_ii, regroup
 from cued_sf2_lab.laplacian_pyramid import bpp
 from cued_sf2_lab.laplacian_pyramid import quantise
 
+from .common import rms_err, calculate_bits
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-
-# warnings.filterwarnings("error")
 
 class LBT():
     
@@ -35,7 +34,7 @@ class LBT():
         self.CN = dct_ii(N)
         self.t = np.s_[N//2:-N//2]
 
-        self.target_rms = self.rms_err(quantise(X, quant_step), X)
+        self.target_rms = rms_err(quantise(X, quant_step), X)
 
     def encode(self):
         Xp = self.prefilter()
@@ -74,11 +73,6 @@ class LBT():
         Zp[self.t,:] = colxfm(Zp[self.t,:], self.Pr.T)
         return Zp
     
-    def calculate_bits(self, X): 
-        entropy = bpp(X)
-        bits = np.shape(X)[0]*np.shape(X)[1]*entropy
-        return bits
-
     def dctbpp(self, Yr, N):
         entropies = np.zeros((N,N))
         # width of subimage: 
@@ -100,7 +94,7 @@ class LBT():
         Y = self.encode()
         Yq = quantise(Y, step)
         Zp = self.decode(Yq)
-        return self.rms_err(Zp, X)
+        return rms_err(Zp, X)
 
     def rms_diff(self, X, step):
         rms_diff = self.get_rms_error(X, step)
@@ -119,13 +113,13 @@ class LBT():
         
         return False
     
-    # def optimal_enc_dec(self, X, N):
-    #     opt_step = self.get_optimum_step(X, N)
-    #     self.__init__(X, N)
-    #     Y = self.encode()
-    #     Yq = quantise(Y, opt_step)
-    #     Zp = self.decode(Yq)
-    #     return Zp
+    def enc_dec_quantise_rise(self, X, N, q_step, rise):
+        # opt_step = self.get_optimum_step(X, N)
+        self.__init__(X, N)
+        Y = self.encode()
+        Yq = quantise(Y, q_step, rise)
+        Zp = self.decode(Yq)
+        return Zp
 
     def get_cr_with_opt_step(self, X, N):
         opt_step = self.get_optimum_step(X, N)
@@ -136,13 +130,9 @@ class LBT():
         cr = self.comp_ratio(Yr)
         return cr
 
-    def rms_err(self, Zp, X):
-        """Calculates the RMS error of the LBT scheme"""
-        return np.std(Zp - X)
-
     def comp_ratio(self, Yr):
         """Calculates the compression ratio of the LBT scheme"""
-        bits_ref = self.calculate_bits(quantise(self.X, self.quant_step))
+        bits_ref = calculate_bits(quantise(self.X, self.quant_step))
         bits_comp = self.dctbpp(Yr, 16)
         print(bits_ref, bits_comp)
         cr = bits_ref / bits_comp
