@@ -32,10 +32,6 @@ class DWT():
         self.X = X
         self.n = n
 
-        # # Le-Gall filters
-        # self.h1 = np.array([-1, 2, 6, 2, -1])/8
-        # self.h2 = np.array([-1, 2, -1])/4
-
         self.target_rms = rms_err(quantise(X, quant_step), X)
         self.bits_ref = calculate_bits(quantise(self.X, self.quant_step))
 
@@ -82,8 +78,9 @@ class DWT():
         Yq = Y
         # top left quadrant
         Yq[0:w//2, 0:w//2] = quantise(Yq[0:w//2, 0:w//2], dwtstep[0,N], rise)
-        dwtent[0,N] = bpp(Yq[1:w//2, 1:w//2])
-        total_bits = bpp(Yq[1:w//2, 1:w//2])*np.shape(Yq[1:w//2, 1:w//2])[0]**2
+
+        dwtent[0,N] = bpp(Yq[0:w//2, 0:w//2])
+        total_bits = bpp(Yq[0:w//2, 0:w//2])*np.shape(Yq[0:w//2, 0:w//2])[0]**2
         
         # quantise Y area by area
         for n in range(N): 
@@ -217,17 +214,17 @@ class DWT():
         self.__init__(X, N)
         
         # generate Y
-        Y = self.encode()
+        Y = self.nlevdwt(self.X, self.n)
         
         # quantise and get Yq
         step_ratios = self.step_ratios_dwt_emse(X, self.n)
         dwtstep = step_ratios*q_step
         Yq, dwtent, total_bits = self.quantdwt(Y, dwtstep, rise)
 
-        Zp = self.decode(Yq)
+        Zp = self.nlevidwt(Yq, self.n)
         quant_error = rms_err(Zp, X)
 
-        return total_bits, quant_error
+        return total_bits, quant_error, Zp
 
     def get_cr_with_opt_step(self, X, N):
         dwtstep = self.get_optimum_step_ratio(X, N)
