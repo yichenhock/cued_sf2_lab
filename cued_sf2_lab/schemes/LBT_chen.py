@@ -119,7 +119,14 @@ class LBT():
         Y = self.encode()
         Yq = quantise(Y, q_step, rise)
         Zp = self.decode(Yq)
-        return Zp
+
+        quant_error = rms_err(Zp, X)
+
+        Yq = quantise(Y, q_step)
+        Yr = regroup(np.copy(Yq), N)/N
+        comp_bits = self.dctbpp(Yr, 16)
+
+        return comp_bits, quant_error
 
     def get_cr_with_opt_step(self, X, N):
         opt_step = self.get_optimum_step(X, N)
