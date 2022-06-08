@@ -14,3 +14,11 @@ def calculate_bits(X):
         entropy = bpp(X)
         bits = np.shape(X)[0]*np.shape(X)[1]*entropy
         return bits
+    
+from skimage.metrics import structural_similarity
+import cv2
+
+def ssim(img1, img2):
+    # Compute SSIM between two images
+    (score, diff) = structural_similarity(img1, img2, full=True)
+    return score
