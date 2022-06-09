@@ -1,17 +1,79 @@
 from typing import Tuple, NamedTuple, Optional
 
 import numpy as np
-from cued_sf2_lab.laplacian_pyramid import quant1, quant2, quantise
+from cued_sf2_lab.laplacian_pyramid import quant1, quant2, quantise, bpp
 from cued_sf2_lab.dct import dct_ii, colxfm, regroup
 from cued_sf2_lab.bitword import bitword
-from cued_sf2_lab.jpeg import diagscan, huffdflt, huffgen, runampl, huffenc, huffdes
+from cued_sf2_lab.jpeg import diagscan, dwtgroup, huffdflt, huffgen, runampl, huffenc, huffdes
 from cued_sf2_lab.lbt import pot_ii
+from cued_sf2_lab.dwt import dwt
+from cued_sf2_lab.dwt import idwt
 
 
-from cued_sf2_lab.schemes.LBT_chen import LBT
+from cued_sf2_lab.schemes.DWT_chen import DWT
 
+def nlevdwt(X, n):
+    m = np.shape(X)[0]
+    
+    Y=dwt(X)
 
-def jpegenc_lbt(X: np.ndarray, N: int = 8, M: int = 8,
+    for i in range(n-1): 
+        m = m//2
+        Y[:m,:m] = dwt(Y[:m,:m])
+        
+    return Y
+
+def nlevidwt(Y, n):
+    m = np.shape(Y)[0]//2**(n-1)
+    
+    for i in range(n-1): 
+        Y[:m,:m] = idwt(Y[:m,:m])
+        m *= 2
+
+    Z = idwt(Y)
+    return Z
+
+def quant1_dwt(Y, dwtstep):
+    # dwtstep has the size of 3x(N+1)
+    N = np.shape(dwtstep)[1]-1 # levels
+    w = np.shape(Y)[0]//(2**(N-1)) # width of the 'Y' image of the smallest level
+
+    dwtent = np.zeros_like(dwtstep)
+    
+    Yq = Y
+    # top left quadrant
+    Yq[0:w//2, 0:w//2] = quant1(Yq[0:w//2, 0:w//2], dwtstep[0,N], rise1=dwtstep[0,N])
+
+    dwtent[0,N] = bpp(Yq[0:w//2, 0:w//2])
+    total_bits = bpp(Yq[0:w//2, 0:w//2])*np.shape(Yq[0:w//2, 0:w//2])[0]**2
+    
+    # quantise Y area by area
+    for n in range(N): 
+        for k in range(3): 
+            if k == 0: # top right quadrant
+                r0 = 0
+                r1 = w//2
+                c0 = w//2
+                c1 = w
+            elif k ==1: # bottom left quadrant
+                r0 = w//2
+                r1 = w
+                c0 = 0
+                c1 = w//2
+            elif k == 2: # bottom right quadrant
+                r0 = w//2
+                r1 = w
+                c0 = w//2
+                c1 = w
+            Yq[r0:r1, c0:c1] = quant1(Yq[r0:r1, c0:c1], dwtstep[k, N-n-1], rise1=dwtstep[k, N-n-1])
+            dwtent[k, N-n-1] = bpp(Yq[r0:r1, c0:c1])
+            total_bits += dwtent[k, N-n-1]*np.shape(Yq[r0:r1, c0:c1])[0]**2
+        w = w*2
+        
+    # quantise final low pass
+    return Yq
+
+def jpegenc_dwt(X: np.ndarray, n,
         opthuff: bool = False, dcbits: int = 8, log: bool = True
         ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     '''
@@ -36,30 +98,25 @@ def jpegenc_lbt(X: np.ndarray, N: int = 8, M: int = 8,
             used in compression when `opthuff` is ``True``.
     '''
 
-    if M % N != 0:
-        raise ValueError('M must be an integer multiple of N!')
+    N = 2**n
+    M = N
 
-    # LBT on input image X.
+    # DWT on input image X.
     if log:
-        print('Forward {} x {} LBT'.format(N, N))
+        print('Forward {} level DWT'.format(n))
 
-    # Prefilter
-    t = np.s_[N//2:-N//2]
-    Xp = np.copy(X)
-    Pf, Pr = pot_ii(N)
-    Xp[t,:] = colxfm(Xp[t,:], Pf)
-    Xp[:,t] = colxfm(Xp[:,t].T, Pf).T
+    # Perform DWT
+    Y = nlevdwt(np.copy(X), n)
 
-    # Perform DCT
-    CN = dct_ii(N)
-    Y = colxfm(colxfm(np.copy(Xp), CN).T, CN).T
+    # Get optimum step ratios
+    dwt_instance = DWT(X, n)
+    dwtstep = dwt_instance.get_optimum_step_ratio(X, n)
 
-    # Get optimum step
-    lbt = LBT(X, N)
-    opt_step = lbt.get_optimum_step(X, N)
+    # Quantise 
+    Yq = quant1_dwt(Y, dwtstep)
 
-    # Quantise
-    Yq = quant1(Y, opt_step, rise1=opt_step).astype('int')
+    # Regroup
+    Yq = dwtgroup(np.copy(Yq), n)
 
     # # DCT on input image X.
     # if log:
@@ -73,7 +130,7 @@ def jpegenc_lbt(X: np.ndarray, N: int = 8, M: int = 8,
     # Yq = quant1(Y, qstep, qstep).astype('int')
 
     # Generate zig-zag scan of AC coefs.
-    scan = diagscan(M)
+    scan = diagscan(N)
 
     # On the first pass use default huffman tables.
     if log:
@@ -97,13 +154,14 @@ def jpegenc_lbt(X: np.ndarray, N: int = 8, M: int = 8,
             yqflat = yq.flatten('F')
             # Encode DC coefficient first
             dccoef = yqflat[0] + 2 ** (dcbits-1)
-            if dccoef not in range(2**dcbits):
+            if dccoef < 0 or dccoef > 2**(dcbits):
                 raise ValueError(
                     'DC coefficients too large for desired number of bits')
             vlc.append(np.array([[dccoef, dcbits]]))
             # Encode the other AC coefficients in scan order
             # huffenc() also updates huffhist.
-            ra1 = runampl(yqflat[scan])
+            # print(yqflat[scan].astype('int')) # TODO prints
+            ra1 = runampl(yqflat[scan].astype('int')) # TODO edited
             vlc.append(huffenc(huffhist, ra1, ehuf))
     # (0, 2) array makes this work even if `vlc == []`
     vlc = np.concatenate([np.zeros((0, 2), dtype=np.intp)] + vlc)
@@ -130,16 +188,18 @@ def jpegenc_lbt(X: np.ndarray, N: int = 8, M: int = 8,
     for r in range(0, sy[0], M):
         for c in range(0, sy[1], M):
             yq = Yq[r:r+M, c:c+M]
-            # Possibly regroup
-            if M > N:
-                yq = regroup(yq, N)
+
+            # # Possibly regroup
+            # if M > N:
+            #     yq = regroup(yq, N)
+            
             yqflat = yq.flatten('F')
             # Encode DC coefficient first
             dccoef = yqflat[0] + 2 ** (dcbits-1)
             vlc.append(np.array([[dccoef, dcbits]]))
             # Encode the other AC coefficients in scan order
             # huffenc() also updates huffhist.
-            ra1 = runampl(yqflat[scan])
+            ra1 = runampl(yqflat[scan].astype('int'))
             vlc.append(huffenc(huffhist, ra1, ehuf))
     # (0, 2) array makes this work even if `vlc == []`
     vlc = np.concatenate([np.zeros((0, 2), dtype=np.intp)] + vlc)
@@ -149,5 +209,4 @@ def jpegenc_lbt(X: np.ndarray, N: int = 8, M: int = 8,
         print('Bits for huffman table = {}'.format(
             (16 + max(dhufftab.huffval.shape))*8))
 
-    return vlc, dhufftab, opt_step
-
+    return vlc, dhufftab, dwtstep
