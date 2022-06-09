@@ -1,7 +1,3 @@
-#ignore images created
-*.png
-*.jpg
-*.pdf
 #ignore system files
 .ipynb_checkpoints
 .vscode/
