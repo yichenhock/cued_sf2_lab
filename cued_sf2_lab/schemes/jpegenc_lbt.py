@@ -1,6 +1,7 @@
 from typing import Tuple, NamedTuple, Optional
 
 import numpy as np
+from cued_sf2_lab.dwt import dwt
 from cued_sf2_lab.laplacian_pyramid import quant1, quant2, quantise
 from cued_sf2_lab.dct import dct_ii, colxfm, regroup
 from cued_sf2_lab.bitword import bitword
@@ -113,7 +114,7 @@ def jpegenc_lbt(X: np.ndarray, N: int = 8, M: int = 8,
     if not opthuff:
         if log:
             print('Bits for coded image = {}'.format(sum(vlc[:, 1])))
-        return vlc, dhufftab
+        return vlc, dhufftab, opt_step
 
     # Design custom huffman tables.
     if log:

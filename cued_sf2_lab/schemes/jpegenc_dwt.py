@@ -9,6 +9,8 @@ from cued_sf2_lab.lbt import pot_ii
 from cued_sf2_lab.dwt import dwt
 from cued_sf2_lab.dwt import idwt
 
+import warnings
+
 
 from cued_sf2_lab.schemes.DWT_chen import DWT
 
@@ -155,8 +157,9 @@ def jpegenc_dwt(X: np.ndarray, n,
             # Encode DC coefficient first
             dccoef = yqflat[0] + 2 ** (dcbits-1)
             if dccoef < 0 or dccoef > 2**(dcbits):
-                raise ValueError(
-                    'DC coefficients too large for desired number of bits')
+                warnings.warn('DC coefficients too large for desired number of bits')
+                # raise ValueError(
+                #     'DC coefficients too large for desired number of bits')
             vlc.append(np.array([[dccoef, dcbits]]))
             # Encode the other AC coefficients in scan order
             # huffenc() also updates huffhist.
@@ -171,7 +174,7 @@ def jpegenc_dwt(X: np.ndarray, n,
     if not opthuff:
         if log:
             print('Bits for coded image = {}'.format(sum(vlc[:, 1])))
-        return vlc, dhufftab
+        return vlc, dhufftab, dwtstep
 
     # Design custom huffman tables.
     if log:
