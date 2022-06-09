@@ -118,7 +118,7 @@ class LBT():
         # opt_step = self.get_optimum_step(X, N)
         self.__init__(X, N)
         Y = self.encode()
-        Yq = quantise(Y, q_step, rise)
+        Yq = quantise(Y, q_step, rise*q_step)
         Zp = self.decode(Yq)
 
         quant_error = rms_err(Zp, X)
@@ -128,6 +128,15 @@ class LBT():
         comp_bits = self.dctbpp(Yr, 16)
 
         return comp_bits, quant_error
+    
+    def opt_enc_dec(self, X, N):
+        self.__init__(X, N)
+        Y = self.encode()
+        opt_step = self.get_optimum_step(X, N)
+        self.__init__(X, N)
+        Yq = quantise(Y, opt_step)
+        Zp = self.decode(Yq)
+        return Zp 
 
     def get_cr_with_opt_step(self, X, N):
         opt_step = self.get_optimum_step(X, N)

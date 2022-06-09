@@ -212,19 +212,26 @@ class DWT():
 
     def enc_dec_quantise_rise(self, X, N, q_step, rise):
         self.__init__(X, N)
-        
+
         # generate Y
         Y = self.nlevdwt(self.X, self.n)
-        
         # quantise and get Yq
         step_ratios = self.step_ratios_dwt_emse(X, self.n)
         dwtstep = step_ratios*q_step
-        Yq, dwtent, total_bits = self.quantdwt(Y, dwtstep, rise)
+        Yq, dwtent, total_bits = self.quantdwt(Y, dwtstep, rise*q_step)
 
         Zp = self.nlevidwt(Yq, self.n)
         quant_error = rms_err(Zp, X)
 
         return total_bits, quant_error, Zp
+
+    def opt_enc_dec(self, X, N):
+        dwtstep = self.get_optimum_step_ratio(np.copy(X), N)
+        self.__init__(X, N)
+        Y = self.nlevdwt(self.X, N)
+        Yq, dwtent, total_bits = self.quantdwt(np.copy(Y), dwtstep)
+        Zp = self.nlevidwt(Yq, self.n)
+        return Zp 
 
     def get_cr_with_opt_step(self, X, N):
         dwtstep = self.get_optimum_step_ratio(X, N)
